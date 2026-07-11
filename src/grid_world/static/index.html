@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Imagination Gridworld</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="toolbar">
+        <div>
+          <h1>Imagination Gridworld</h1>
+          <p id="summary">Loading rollout artifacts...</p>
+        </div>
+        <div class="controls">
+          <button id="prev" type="button" title="Previous rollout">‹</button>
+          <button id="play" type="button" title="Play or pause">Play</button>
+          <button id="next" type="button" title="Next rollout">›</button>
+        </div>
+      </header>
+
+      <section class="boards">
+        <div class="panel">
+          <h2>Real Environment</h2>
+          <canvas id="real" width="480" height="480"></canvas>
+          <p id="realStats"></p>
+        </div>
+        <div class="panel">
+          <h2>Imagined Model</h2>
+          <canvas id="imagined" width="480" height="480"></canvas>
+          <p id="imaginedStats"></p>
+        </div>
+      </section>
+
+      <section class="drift">
+        <h2>Perceptual Drift</h2>
+        <canvas id="drift" width="980" height="220"></canvas>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
