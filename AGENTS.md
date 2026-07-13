@@ -17,6 +17,8 @@ Generated artifacts should go under `data/` or `runs/`, not in source modules.
 - `uv run train-world-model --epochs 30`: train the default MLP dynamics model.
 - `uv run train-world-model --model-type gru --sequence-length 8 --epochs 30`:
   train the GRU dynamics model on contiguous rollout windows.
+- `uv run benchmark-world-models --epochs 10`: compare MLP vs GRU validation
+  error, open-loop drift, training time, and inference throughput.
 - `uv run train-controller --episodes 500`: train DQN inside the learned model.
 - `uv run evaluate`: write evaluation and rollout artifacts to `runs/latest/`.
 - `uv run serve`: start the FastAPI UI at `http://127.0.0.1:8000`.

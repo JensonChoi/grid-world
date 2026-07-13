@@ -22,6 +22,7 @@ collect-data = "grid_world.cli:collect_data_main"
 train-world-model = "grid_world.cli:train_world_model_main"
 train-controller = "grid_world.cli:train_controller_main"
 evaluate = "grid_world.cli:evaluate_main"
+benchmark-world-models = "grid_world.cli:benchmark_world_models_main"
 serve = "grid_world.web:serve_main"
 
 [build-system]

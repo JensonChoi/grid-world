@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from grid_world.config import DATA_DIR, RUNS_DIR, GridConfig, TrainConfig
+from grid_world.benchmark import benchmark_world_models
 from grid_world.data import collect_random_transitions
 from grid_world.evaluate import evaluate
 from grid_world.train_controller import train_controller
@@ -61,3 +62,25 @@ def evaluate_main() -> None:
     args = parser.parse_args()
     result = evaluate(args.world_model, args.controller, args.output_dir, args.episodes, args.seed)
     print(result)
+
+
+def benchmark_world_models_main() -> None:
+    parser = argparse.ArgumentParser(description="Benchmark MLP and GRU world models.")
+    parser.add_argument("--data", type=Path, default=DATA_DIR / "random_transitions.npz")
+    parser.add_argument("--output-dir", type=Path, default=RUNS_DIR / "benchmarks")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--sequence-length", type=int, default=8)
+    parser.add_argument("--rollouts", type=int, default=25)
+    parser.add_argument("--horizon", type=int, default=20)
+    parser.add_argument("--seed", type=int, default=2024)
+    args = parser.parse_args()
+    result = benchmark_world_models(
+        data_path=args.data,
+        output_dir=args.output_dir,
+        epochs=args.epochs,
+        sequence_length=args.sequence_length,
+        rollouts=args.rollouts,
+        horizon=args.horizon,
+        seed=args.seed,
+    )
+    print({"output": str(args.output_dir), "plots": result["plots"]})
