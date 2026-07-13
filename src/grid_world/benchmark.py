@@ -26,6 +26,8 @@ def benchmark_world_models(
     rollouts: int = 25,
     horizon: int = 20,
     seed: int = 2024,
+    early_stopping_patience: int | None = 5,
+    min_delta: float = 1e-4,
     train_config: TrainConfig = TrainConfig(),
     grid_config: GridConfig = GridConfig(),
 ) -> Dict[str, object]:
@@ -41,6 +43,8 @@ def benchmark_world_models(
             "horizon": horizon,
             "seed": seed,
             "device": str(device),
+            "early_stopping_patience": early_stopping_patience,
+            "min_delta": min_delta,
         },
         "models": {},
     }
@@ -55,6 +59,8 @@ def benchmark_world_models(
             config=train_config,
             model_type=model_type,
             sequence_length=sequence_length,
+            early_stopping_patience=early_stopping_patience,
+            min_delta=min_delta,
         )
         train_seconds = time.perf_counter() - started
         model = load_world_model(Path(str(training["checkpoint"])), device)
@@ -64,6 +70,7 @@ def benchmark_world_models(
         results["models"][model_type] = {
             "checkpoint": training["checkpoint"],
             "train_seconds": train_seconds,
+            "epochs_trained": len(history["train_loss"]),
             "inference_steps_per_second": throughput,
             "final_val_state_mse": float(history["val_state_mse"][-1]),
             "final_val_reward_mse": float(history["val_reward_mse"][-1]),

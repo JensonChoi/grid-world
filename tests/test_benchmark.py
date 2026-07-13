@@ -25,6 +25,7 @@ def test_benchmark_world_models_writes_metrics_and_plots(tmp_path):
         rollouts=2,
         horizon=3,
         seed=1,
+        early_stopping_patience=1,
         train_config=TrainConfig(seed=1, batch_size=2, hidden_size=8),
         grid_config=GridConfig(width=4, height=4, max_steps=4, goal=(3, 3), walls=[]),
     )
@@ -33,3 +34,5 @@ def test_benchmark_world_models_writes_metrics_and_plots(tmp_path):
     assert (output_dir / "benchmarks.json").exists()
     assert (output_dir / "validation_mse.png").exists()
     assert (output_dir / "open_loop_drift.png").exists()
+    assert result["models"]["mlp"]["epochs_trained"] >= 1
+    assert result["models"]["gru"]["epochs_trained"] >= 1

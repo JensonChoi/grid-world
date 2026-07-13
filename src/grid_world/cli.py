@@ -29,6 +29,8 @@ def train_world_model_main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--model-type", choices=["mlp", "gru"], default="mlp")
     parser.add_argument("--sequence-length", type=int, default=8)
+    parser.add_argument("--early-stopping-patience", type=int, default=None)
+    parser.add_argument("--min-delta", type=float, default=1e-4)
     args = parser.parse_args()
     result = train_world_model(
         args.data,
@@ -37,6 +39,8 @@ def train_world_model_main() -> None:
         TrainConfig(seed=args.seed),
         args.model_type,
         args.sequence_length,
+        args.early_stopping_patience,
+        args.min_delta,
     )
     print({"checkpoint": result["checkpoint"], "device": result["device"]})
 
@@ -73,6 +77,8 @@ def benchmark_world_models_main() -> None:
     parser.add_argument("--rollouts", type=int, default=25)
     parser.add_argument("--horizon", type=int, default=20)
     parser.add_argument("--seed", type=int, default=2024)
+    parser.add_argument("--early-stopping-patience", type=int, default=5)
+    parser.add_argument("--min-delta", type=float, default=1e-4)
     args = parser.parse_args()
     result = benchmark_world_models(
         data_path=args.data,
@@ -82,5 +88,7 @@ def benchmark_world_models_main() -> None:
         rollouts=args.rollouts,
         horizon=args.horizon,
         seed=args.seed,
+        early_stopping_patience=args.early_stopping_patience,
+        min_delta=args.min_delta,
     )
     print({"output": str(args.output_dir), "plots": result["plots"]})
