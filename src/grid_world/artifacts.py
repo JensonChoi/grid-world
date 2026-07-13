@@ -8,7 +8,7 @@ import torch
 
 from grid_world.config import GridConfig, RUNS_DIR
 from grid_world.env import GridWorld
-from grid_world.models import DQN, MLPWorldModel
+from grid_world.models import DQN, GRUWorldModel, MLPWorldModel
 from grid_world.utils import ensure_dir, write_json
 
 
@@ -17,14 +17,21 @@ def save_checkpoint(path: Path, model: torch.nn.Module, metadata: Dict[str, Any]
     torch.save({"model_state": model.state_dict(), "metadata": metadata}, path)
 
 
-def load_world_model(path: Path, device: torch.device) -> MLPWorldModel:
+def load_world_model(path: Path, device: torch.device) -> torch.nn.Module:
     payload = torch.load(path, map_location=device)
     metadata = payload["metadata"]
-    model = MLPWorldModel(
-        state_size=int(metadata["state_size"]),
-        action_size=int(metadata["action_size"]),
-        hidden_size=int(metadata["hidden_size"]),
-    ).to(device)
+    model_type = metadata.get("model_type", "mlp")
+    model_kwargs = {
+        "state_size": int(metadata["state_size"]),
+        "action_size": int(metadata["action_size"]),
+        "hidden_size": int(metadata["hidden_size"]),
+    }
+    if model_type == "mlp":
+        model = MLPWorldModel(**model_kwargs).to(device)
+    elif model_type == "gru":
+        model = GRUWorldModel(**model_kwargs).to(device)
+    else:
+        raise ValueError(f"Unsupported world model type in checkpoint: {model_type}")
     model.load_state_dict(payload["model_state"])
     model.eval()
     return model
@@ -55,7 +62,7 @@ def trajectory_to_json(states: List[np.ndarray], actions: List[int], rewards: Li
 
 @torch.no_grad()
 def imagined_rollout(
-    world_model: MLPWorldModel,
+    world_model: torch.nn.Module,
     dqn: DQN,
     start_state: np.ndarray,
     horizon: int,

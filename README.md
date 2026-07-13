@@ -10,12 +10,18 @@ inside that learned model.
 uv sync --extra dev
 uv run collect-data --episodes 1000
 uv run train-world-model --epochs 30
+uv run train-world-model --model-type gru --sequence-length 8 --epochs 30
 uv run train-controller --episodes 500
 uv run evaluate
 uv run serve
 ```
 
 Open the printed local URL to inspect real vs imagined rollouts and drift.
+
+`train-world-model` uses an MLP by default. Pass `--model-type gru` to train the
+sequence model on contiguous rollout windows. GRU training requires data
+collected by the current `collect-data` command because older transition files
+do not include episode boundary metadata.
 
 ## Project Shape
 

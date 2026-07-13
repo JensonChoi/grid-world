@@ -44,6 +44,56 @@ class TransitionDataset(Dataset):
         )
 
 
+class SequenceTransitionDataset(Dataset):
+    def __init__(self, path: Path, sequence_length: int):
+        if sequence_length < 1:
+            raise ValueError("sequence_length must be at least 1")
+
+        data = np.load(path)
+        required = {"episode_starts", "episode_lengths"}
+        missing = required.difference(data.files)
+        if missing:
+            names = ", ".join(sorted(missing))
+            raise ValueError(
+                f"Cannot train a GRU world model from {path}: missing {names}. "
+                "Re-run collect-data to generate sequence metadata."
+            )
+
+        self.states = torch.tensor(data["states"], dtype=torch.float32)
+        self.actions = torch.tensor(data["actions"], dtype=torch.long)
+        self.next_states = torch.tensor(data["next_states"], dtype=torch.float32)
+        self.rewards = torch.tensor(data["rewards"], dtype=torch.float32).unsqueeze(-1)
+        self.dones = torch.tensor(data["dones"], dtype=torch.float32).unsqueeze(-1)
+        self.sequence_length = sequence_length
+        self.windows: List[Tuple[int, int]] = []
+
+        for start, length in zip(data["episode_starts"], data["episode_lengths"]):
+            episode_start = int(start)
+            episode_length = int(length)
+            for offset in range(0, episode_length - sequence_length + 1):
+                start_idx = episode_start + offset
+                self.windows.append((start_idx, start_idx + sequence_length))
+
+        if not self.windows:
+            raise ValueError(
+                f"No GRU training sequences of length {sequence_length} found in {path}. "
+                "Collect more data or choose a shorter --sequence-length."
+            )
+
+    def __len__(self) -> int:
+        return len(self.windows)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        start, end = self.windows[idx]
+        return (
+            self.states[start:end],
+            self.actions[start:end],
+            self.next_states[start:end],
+            self.rewards[start:end],
+            self.dones[start:end],
+        )
+
+
 def collect_random_transitions(
     episodes: int,
     seed: int,
@@ -57,12 +107,15 @@ def collect_random_transitions(
     next_states: List[np.ndarray] = []
     rewards: List[float] = []
     dones: List[bool] = []
+    episode_starts: List[int] = []
     episode_returns: List[float] = []
     episode_lengths: List[int] = []
 
     for episode in range(episodes):
         state = env.reset(seed + episode)
         total_reward = 0.0
+        episode_starts.append(len(actions))
+        length = 0
         for step in range(config.max_steps):
             action = int(rng.integers(0, env.action_size))
             next_state, reward, done, _ = env.step(action)
@@ -73,11 +126,10 @@ def collect_random_transitions(
             dones.append(bool(done))
             total_reward += float(reward)
             state = next_state
+            length = step + 1
             if done:
-                episode_lengths.append(step + 1)
                 break
-        else:
-            episode_lengths.append(config.max_steps)
+        episode_lengths.append(length)
         episode_returns.append(total_reward)
 
     ensure_dir(output.parent)
@@ -88,6 +140,8 @@ def collect_random_transitions(
         next_states=np.asarray(next_states, dtype=np.float32),
         rewards=np.asarray(rewards, dtype=np.float32),
         dones=np.asarray(dones, dtype=np.bool_),
+        episode_starts=np.asarray(episode_starts, dtype=np.int64),
+        episode_lengths=np.asarray(episode_lengths, dtype=np.int64),
     )
     return {
         "path": str(output),

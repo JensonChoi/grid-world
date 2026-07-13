@@ -21,13 +21,22 @@ def collect_data_main() -> None:
 
 
 def train_world_model_main() -> None:
-    parser = argparse.ArgumentParser(description="Train the MLP world model.")
+    parser = argparse.ArgumentParser(description="Train a learned world model.")
     parser.add_argument("--data", type=Path, default=DATA_DIR / "random_transitions.npz")
     parser.add_argument("--output-dir", type=Path, default=RUNS_DIR / "latest")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--model-type", choices=["mlp", "gru"], default="mlp")
+    parser.add_argument("--sequence-length", type=int, default=8)
     args = parser.parse_args()
-    result = train_world_model(args.data, args.output_dir, args.epochs, TrainConfig(seed=args.seed))
+    result = train_world_model(
+        args.data,
+        args.output_dir,
+        args.epochs,
+        TrainConfig(seed=args.seed),
+        args.model_type,
+        args.sequence_length,
+    )
     print({"checkpoint": result["checkpoint"], "device": result["device"]})
 
 
