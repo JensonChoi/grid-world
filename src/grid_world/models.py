@@ -54,10 +54,24 @@ class GRUWorldModel(nn.Module):
         self.done_head = nn.Linear(hidden_size, 1)
 
     def forward(self, states: torch.Tensor, actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if states.ndim == 2:
+            states = states.unsqueeze(1)
+        if actions.ndim == 1:
+            actions = actions.unsqueeze(1)
         x = torch.cat([states, one_hot(actions, self.action_size)], dim=-1)
         encoded = torch.relu(self.encoder(x))
         output, _ = self.gru(encoded)
         return torch.sigmoid(self.next_state_head(output)), self.reward_head(output), self.done_head(output)
+
+    @torch.no_grad()
+    def predict_step(self, state: torch.Tensor, action: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if state.ndim == 1:
+            state = state.unsqueeze(0)
+        if action.ndim == 0:
+            action = action.unsqueeze(0)
+        next_state, reward, done_logit = self.forward(state, action)
+        done_prob = torch.sigmoid(done_logit)
+        return next_state.squeeze(0).squeeze(0), reward.squeeze(0).squeeze(0), done_prob.squeeze(0).squeeze(0)
 
 
 class DQN(nn.Module):

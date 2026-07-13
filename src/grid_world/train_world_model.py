@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,8 +11,8 @@ from torch.utils.data import DataLoader, random_split
 
 from grid_world.artifacts import save_checkpoint
 from grid_world.config import RUNS_DIR, TrainConfig
-from grid_world.data import TransitionDataset
-from grid_world.models import MLPWorldModel
+from grid_world.data import SequenceTransitionDataset, TransitionDataset
+from grid_world.models import GRUWorldModel, MLPWorldModel
 from grid_world.utils import ensure_dir, set_seed, write_json
 
 
@@ -21,10 +21,18 @@ def train_world_model(
     output_dir: Path = RUNS_DIR / "latest",
     epochs: int = 30,
     config: TrainConfig = TrainConfig(),
+    model_type: Literal["mlp", "gru"] = "mlp",
+    sequence_length: int = 8,
+    early_stopping_patience: int | None = None,
+    min_delta: float = 1e-4,
 ) -> Dict[str, object]:
     set_seed(config.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = TransitionDataset(data_path)
+    dataset = (
+        SequenceTransitionDataset(data_path, sequence_length)
+        if model_type == "gru"
+        else TransitionDataset(data_path)
+    )
     train_size = max(1, int(0.85 * len(dataset)))
     val_size = max(1, len(dataset) - train_size)
     train_dataset, val_dataset = random_split(
@@ -35,12 +43,20 @@ def train_world_model(
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
 
-    state_size = int(dataset.states.shape[1])
+    state_size = int(dataset.states.shape[-1])
     action_size = int(dataset.actions.max().item()) + 1
-    model = MLPWorldModel(state_size, action_size, config.hidden_size).to(device)
+    if model_type == "gru":
+        model = GRUWorldModel(state_size, action_size, config.hidden_size).to(device)
+    elif model_type == "mlp":
+        model = MLPWorldModel(state_size, action_size, config.hidden_size).to(device)
+    else:
+        raise ValueError(f"Unsupported world model type: {model_type}")
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     mse = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()
+    best_val_state_mse = float("inf")
+    epochs_without_improvement = 0
+    stopped_reason = "max_epochs"
 
     history = {"train_loss": [], "val_state_mse": [], "val_reward_mse": [], "val_done_bce": []}
     for _ in range(epochs):
@@ -65,6 +81,15 @@ def train_world_model(
         history["train_loss"].append(total / max(1, count))
         for key, value in val_metrics.items():
             history[key].append(value)
+        val_state_mse = val_metrics["val_state_mse"]
+        if val_state_mse < best_val_state_mse - min_delta:
+            best_val_state_mse = val_state_mse
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+        if early_stopping_patience is not None and epochs_without_improvement >= early_stopping_patience:
+            stopped_reason = "early_stopping"
+            break
 
     ensure_dir(output_dir)
     checkpoint = output_dir / "world_model.pt"
@@ -72,8 +97,14 @@ def train_world_model(
         "state_size": state_size,
         "action_size": action_size,
         "hidden_size": config.hidden_size,
-        "epochs": epochs,
+        "max_epochs": epochs,
+        "epochs_trained": len(history["train_loss"]),
         "data_path": str(data_path),
+        "model_type": model_type,
+        "sequence_length": sequence_length if model_type == "gru" else None,
+        "early_stopping_patience": early_stopping_patience,
+        "min_delta": min_delta,
+        "stopped_reason": stopped_reason,
     }
     save_checkpoint(checkpoint, model, metadata)
     write_json(output_dir / "world_model_metrics.json", {"history": history, "metadata": metadata})
@@ -82,7 +113,7 @@ def train_world_model(
 
 
 @torch.no_grad()
-def evaluate_world_model(model: MLPWorldModel, loader: DataLoader, device: torch.device) -> Dict[str, float]:
+def evaluate_world_model(model: torch.nn.Module, loader: DataLoader, device: torch.device) -> Dict[str, float]:
     model.eval()
     mse = nn.MSELoss(reduction="sum")
     bce = nn.BCEWithLogitsLoss(reduction="sum")

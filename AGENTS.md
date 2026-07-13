@@ -14,7 +14,12 @@ Generated artifacts should go under `data/` or `runs/`, not in source modules.
 
 - `uv sync --extra dev`: create/update the local environment with test tools.
 - `uv run collect-data --episodes 1000`: collect random-policy transitions.
-- `uv run train-world-model --epochs 30`: train the learned dynamics model.
+- `uv run train-world-model --epochs 30`: train the default MLP dynamics model.
+- `uv run train-world-model --model-type gru --sequence-length 8 --epochs 30`:
+  train the GRU dynamics model on contiguous rollout windows.
+- `uv run benchmark-world-models --epochs 50`: compare MLP vs GRU validation
+  error, open-loop drift, training time, and inference throughput with
+  early-stopping convergence by default.
 - `uv run train-controller --episodes 500`: train DQN inside the learned model.
 - `uv run evaluate`: write evaluation and rollout artifacts to `runs/latest/`.
 - `uv run serve`: start the FastAPI UI at `http://127.0.0.1:8000`.
@@ -26,8 +31,8 @@ Use Python 3.10+ syntax with 4-space indentation and type hints for public
 functions. Keep modules focused by responsibility, and prefer small dataclasses
 for configuration objects. Use `snake_case` for functions, variables, files, and
 CLI command implementation functions. Use `PascalCase` for classes such as
-`GridWorld`, `MLPWorldModel`, and `DQN`. Keep comments brief and reserve them
-for non-obvious logic.
+`GridWorld`, `MLPWorldModel`, `GRUWorldModel`, and `DQN`. Keep comments brief
+and reserve them for non-obvious logic.
 
 ## Testing Guidelines
 
@@ -52,4 +57,5 @@ manual browser check performed with `uv run serve`.
 
 Do not overwrite generated training artifacts unless the task calls for a new
 run. Prefer changing source, tests, and docs separately from large files in
-`data/` or `runs/`.
+`data/` or `runs/`. GRU world-model training requires transition files collected
+with the current data schema, including episode boundary metadata.
